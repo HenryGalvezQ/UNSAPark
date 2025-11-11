@@ -84,6 +84,7 @@ export default function PerfilScreen({ onLogout }: PerfilScreenProps) {
           <Ionicons name="person-circle" size={80} color="#0066CC" />
         </View>
         <Text style={styles.name}>{profile.nombreCompleto}</Text>
+        <Text style={styles.email}>{profile.email}</Text>
         <Text style={styles.dni}>DNI: {profile.dni}</Text>
       </View>
 
@@ -140,6 +141,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
+  },
+  email: { // <-- AÑADIDO
+    fontSize: 16,
+    color: '#0066CC', // Color de acento
+    marginTop: 4,
   },
   dni: {
     fontSize: 16,
@@ -211,6 +217,6 @@ const styles = StyleSheet.create({
   },
   logoutButtonContainer: {
     padding: 20,
-    paddingBottom: 40, // Espacio extra al final
+    paddingBottom: 30, // Espacio extra al final
   },
 });

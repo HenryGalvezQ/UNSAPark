@@ -1,133 +1,181 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useRoute } from '@react-navigation/native';
-import { Area, PuertaStatus } from '../types/entities'; // Importamos nuestros tipos
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native'; // <-- 1. Importar useNavigation
+import { Area, Puerta } from '../types/entities';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps'; 
+import { Ionicons } from '@expo/vector-icons';
 
-// Un componente simple para la tarjeta de la puerta
-const PuertaCard = ({ nombre, status }: { nombre: string, status: PuertaStatus }) => {
-  const isOpen = status === 'OPEN';
+// --- Tipos de Navegación ---
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
+type AreaDetailNavigationProp = NativeStackNavigationProp<RootStackParamList, 'RouteMap'>;
+
+// --- Componente de Tarjeta de Puerta ACTUALIZADO ---
+const PuertaCard = ({ puerta }: { puerta: Puerta }) => {
+  const navigation = useNavigation<AreaDetailNavigationProp>(); // <-- 2. Obtener navegación
+
+  const disponibles = puerta.cuposTotales - puerta.cuposOcupados;
+  const isOpen = puerta.status === 'OPEN';
+  const hasCupos = disponibles > 0;
+  
+  // --- 3. Lógica del botón ---
+  const isButtonDisabled = !isOpen || !hasCupos;
+
+  const color = isOpen && hasCupos ? '#2E8B57' : (isOpen ? '#FFA500' : '#DC143C');
+
+  const handlePress = () => {
+    if (!isButtonDisabled) {
+      navigation.navigate('RouteMap', { puerta: puerta });
+    }
+  };
+
   return (
-    <View style={[styles.puertaCard, isOpen ? styles.puertaOpen : styles.puertaClosed]}>
-      <Text style={styles.puertaName}>{nombre}</Text>
-      <Text style={styles.puertaStatus}>{isOpen ? 'Abierta' : `Cerrada (${status})`}</Text>
+    <View style={[styles.puertaCard, { borderColor: color }]}>
+      <View style={styles.puertaInfo}>
+        <Text style={styles.puertaName}>{puerta.nombre}</Text>
+        {isOpen ? (
+          <Text style={[styles.cuposText, { color: color }]}>
+            {disponibles} / {puerta.cuposTotales} disponibles
+          </Text>
+        ) : (
+          <Text style={styles.cuposTextCerrado}>
+            Cerrada ({puerta.status})
+          </Text>
+        )}
+      </View>
+      
+      {/* --- 4. Botón "Trazar Ruta" --- */}
+      <TouchableOpacity 
+        style={[styles.routeButton, isButtonDisabled && styles.routeButtonDisabled]}
+        disabled={isButtonDisabled}
+        onPress={handlePress}
+      >
+        <Ionicons name="map-outline" size={20} color={isButtonDisabled ? '#999' : '#0066CC'} />
+        <Text style={[styles.routeButtonText, isButtonDisabled && styles.routeButtonTextDisabled]}>
+          Ruta
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
+// --- Fin PuertaCard ---
+
 
 export default function AreaDetailScreen() {
-  // 1. Usamos 'useRoute' para obtener la información de la ruta
   const route = useRoute();
-  
-  // 2. Extraemos el parámetro 'area' que le pasamos
-  // @ts-ignore - Ignoramos el error de tipo por ahora para mantenerlo simple
+  // @ts-ignore
   const { area } = route.params as { area: Area };
 
-  const disponibles = area.cuposTotales - area.cuposOcupados;
+  const initialRegion = {
+    latitude: area.latitude,
+    longitude: area.longitude,
+    latitudeDelta: area.latitudeDelta,
+    longitudeDelta: area.longitudeDelta,
+  };
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header con el nombre y cupos */}
       <View style={styles.header}>
         <Text style={styles.title}>{area.nombre}</Text>
-        <Text style={cuposText(disponibles)}>
-          {disponibles} / {area.cuposTotales}
-        </Text>
-        <Text style={styles.cuposLabel}>cupos disponibles</Text>
+        <Text style={styles.subtitle}>Estado de accesos y mapa</Text>
       </View>
 
-      {/* Placeholder para el Mapa */}
-      <View style={styles.mapPlaceholder}>
-        <Text style={styles.mapText}>[Aquí iría el Mapa]</Text>
-        <Text>(react-native-maps)</Text>
-      </View>
-
-      {/* Lista de Puertas */}
+      <MapView
+        // ... (el mapa no cambia)
+        style={styles.map}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={initialRegion}
+        showsUserLocation
+        showsMyLocationButton
+      >
+        {area.puertas.map(puerta => (
+          <Marker
+            key={puerta.id}
+            coordinate={{
+              latitude: puerta.latitude,
+              longitude: puerta.longitude,
+            }}
+            title={puerta.nombre}
+            description={`Cupos: ${puerta.cuposOcupados}/${puerta.cuposTotales}`}
+            pinColor={puerta.status === 'OPEN' && puerta.cuposOcupados < puerta.cuposTotales ? 'green' : (puerta.status === 'OPEN' ? 'orange' : 'red')}
+          />
+        ))}
+      </MapView>
+      
       <View style={styles.puertasSection}>
         <Text style={styles.sectionTitle}>Accesos Vehiculares</Text>
         {area.puertas.map(puerta => (
-          <PuertaCard key={puerta.id} nombre={puerta.nombre} status={puerta.status} />
+          <PuertaCard key={puerta.id} puerta={puerta} />
         ))}
       </View>
     </ScrollView>
   );
 }
 
-// --- Estilos ---
-
-// Función de estilo dinámico (la movimos aquí)
-const cuposText = (disponibles: number) => ({
-  fontSize: 48,
-  fontWeight: 'bold',
-  color: disponibles > 10 ? '#2E8B57' : (disponibles > 0 ? '#FFA500' : '#DC143C'),
-});
-
+// --- Estilos Actualizados ---
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#0066CC',
-  },
-  cuposLabel: {
-    fontSize: 16,
-    color: '#555',
-    marginTop: 4,
-  },
-  mapPlaceholder: {
-    height: 200,
-    backgroundColor: '#e0e0e0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    margin: 20,
-    borderRadius: 12,
-  },
-  mapText: {
-    fontSize: 18,
-    color: '#888',
-    fontWeight: '500',
-  },
-  puertasSection: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
+  // ... (container, header, title, subtitle, map... no cambian)
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
+  header: { backgroundColor: '#ffffff', paddingVertical: 24, paddingHorizontal: 20, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  title: { fontSize: 28, fontWeight: 'bold', color: '#0066CC' },
+  subtitle: { fontSize: 16, color: '#555', marginTop: 4 },
+  map: { height: 300, margin: 20, borderRadius: 12 },
+  puertasSection: { paddingHorizontal: 20, paddingBottom: 20 },
+  sectionTitle: { fontSize: 20, fontWeight: '600', color: '#333', marginBottom: 16 },
+
   puertaCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 5,
+    flexDirection: 'row', // <-- 5. Alineación horizontal
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  puertaOpen: {
-    borderColor: '#2E8B57', // Verde
-  },
-  puertaClosed: {
-    borderColor: '#DC143C', // Rojo
+  puertaInfo: {
+    flex: 1, // Permite que el texto se ajuste
   },
   puertaName: {
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
   },
-  puertaStatus: {
-    fontSize: 14,
-    color: '#555',
-    marginTop: 4,
+  cuposText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
+  cuposTextCerrado: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 8,
+    color: '#777',
+    fontStyle: 'italic',
+  },
+  
+  // --- 6. Estilos para el nuevo botón ---
+  routeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f5ff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#0066CC'
+  },
+  routeButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+    borderColor: '#ddd'
+  },
+  routeButtonText: {
+    color: '#0066CC',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  routeButtonTextDisabled: {
+    color: '#999',
+  }
 });

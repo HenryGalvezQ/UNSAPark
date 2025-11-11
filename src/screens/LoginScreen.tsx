@@ -13,16 +13,16 @@ type LoginScreenProps = {
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
   // Estados para guardar los datos del formulario
-  const [dni, setDni] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   
   // Estado para mostrar un "cargando..." mientras validamos
   const [isLoading, setIsLoading] = useState(false);
-
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   // Función que se llama al presionar "Ingresar"
   const handleLoginPress = async () => {
-    if (!dni || !password) {
-      Alert.alert('Error', 'Por favor, ingrese su DNI y contraseña.');
+    if (!email || !password) {
+      Alert.alert('Error', 'Por favor, ingrese su correo y contraseña.');
       return;
     }
 
@@ -30,7 +30,7 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
 
     try {
       // Llamamos a nuestra API simulada
-      const exito = await ParkingService.login(dni, password);
+      const exito = await ParkingService.login(email, password);
 
       if (exito) {
         // Si el login es exitoso, llamamos a la función onLogin
@@ -38,13 +38,17 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
         onLogin();
       } else {
         // Si no, mostramos un error
-        Alert.alert('Error', 'DNI o contraseña incorrectos.');
+        Alert.alert('Error', 'Correo o contraseña incorrectos.');
       }
     } catch (error) {
       Alert.alert('Error', 'Ocurrió un problema de conexión.');
     } finally {
       setIsLoading(false); // Ocultar "cargando"
     }
+  };
+
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
   };
 
   return (
@@ -62,19 +66,34 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
       <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
-          placeholder="DNI"
-          value={dni}
-          onChangeText={setDni} // Actualiza el estado 'dni'
-          keyboardType="numeric" // Muestra teclado numérico
-          maxLength={8}
+          placeholder="Correo Electrónico"
+          value={email}
+          onChangeText={setEmail} // Actualiza el estado 'email'
+          keyboardType="email-address" // Muestra teclado para email
+          autoCapitalize="none" // Desactiva mayúsculas automáticas
+          autoCorrect={false}
         />
-        <TextInput
-          style={styles.input}
-          placeholder="Contraseña"
-          value={password}
-          onChangeText={setPassword} // Actualiza el estado 'password'
-          secureTextEntry // Oculta la contraseña
-        />
+        <View style={styles.passwordContainer}>
+          <TextInput
+            style={styles.inputPassword}
+            placeholder="Contraseña"
+            value={password}
+            onChangeText={setPassword}
+            // El 'secureTextEntry' ahora depende del estado
+            secureTextEntry={!isPasswordVisible}
+          />
+          <TouchableOpacity 
+            style={styles.eyeIcon} 
+            onPress={togglePasswordVisibility}
+          >
+            <Ionicons 
+              // Cambia el ícono dependiendo del estado
+              name={isPasswordVisible ? 'eye-off' : 'eye'} 
+              size={24} 
+              color="#555" 
+            />
+          </TouchableOpacity>
+        </View>
 
         {/* Usamos un TouchableOpacity para un botón más bonito */}
         <TouchableOpacity 
@@ -126,6 +145,24 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     fontSize: 16,
     marginBottom: 16,
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 16,
+  },
+  inputPassword: {
+    flex: 1, // El input toma todo el espacio
+    paddingHorizontal: 16, 
+    paddingVertical: 12, 
+    fontSize: 16,
+  },
+  eyeIcon: {
+    padding: 12, // Área táctil para el ícono
   },
   button: {
     backgroundColor: '#0066CC',

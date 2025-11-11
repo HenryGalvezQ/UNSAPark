@@ -9,6 +9,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import HistorialScreen from './src/screens/HistorialScreen';
 import PerfilScreen from './src/screens/PerfilScreen';
 import AreaDetailScreen from './src/screens/AreaDetailScreen'; // <-- 1. Importamos la nueva pantalla
+import RouteMapScreen from './src/screens/RouteMapScreen';
 
 // Importamos íconos (¡Expo los incluye por defecto!)
 import { Ionicons } from '@expo/vector-icons';
@@ -85,6 +86,14 @@ export default function App() {
               options={{ 
                 title: 'Detalle del Área',
                 headerBackTitle: 'Volver', // Texto de "Volver" en iOS
+              }} 
+            />
+            <Stack.Screen 
+              name="RouteMap" 
+              component={RouteMapScreen}
+              options={{ 
+                title: 'Trazando Ruta',
+                headerBackTitle: 'Volver',
               }} 
             />
           </>
