@@ -1,0 +1,177 @@
+HistorialScreen.tsx:
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+
+export default function HistorialScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Mi Historial</Text>
+      <Text>Aquí irá la lista de ingresos y salidas.</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+});
+
+HomeScreen.tsx:
+
+
+LoginScreen.tsx:
+import React from 'react';
+import { View, Text, Button, StyleSheet } from 'react-native';
+
+// Simulación de 'props' de navegación
+type LoginScreenProps = {
+  onLogin: () => void; // Función que pasaremos para "iniciar sesión"
+};
+
+export default function LoginScreen({ onLogin }: LoginScreenProps) {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>UNSA Park</Text>
+      <Text style={styles.subtitle}>Iniciar Sesión</Text>
+      {/* Por ahora, el botón llama a la función onLogin.
+        Más adelante, aquí irán los campos de DNI y contraseña.
+      */}
+      <Button title="Ingresar (Simulación)" onPress={onLogin} />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#0066CC',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#555',
+    marginBottom: 40,
+  },
+});
+
+PerfilScreen.tsx:
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+
+export default function HistorialScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Mi Historial</Text>
+      <Text>Aquí irá la lista de ingresos y salidas.</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+});
+
+ParkingService.ts:
+// Importamos las interfaces que acabamos de definir
+import { ParkingStatusResponse, Area } from '../types/entities';
+
+// --- ESTOS SON TUS DATOS ESTÁTICOS ---
+// Basado en lo que me dijiste
+const MOCK_AREAS: Area[] = [
+  {
+    id: "ing",
+    nombre: "Área Ingenierías",
+    cuposTotales: 50,
+    cuposOcupados: 22, // Simulado
+    status: "OPEN",
+    mensaje: "",
+    puertas: [
+      { id: "ing_pauc", nombre: "Puerta Paucarpata", status: "OPEN" },
+      { id: "ing_inde", nombre: "Puerta Independencia", status: "OPEN" },
+      { id: "ing_vene", nombre: "Puerta Venezuela", status: "MAINTENANCE" }
+    ]
+  },
+  {
+    id: "soc",
+    nombre: "Área Sociales",
+    cuposTotales: 50,
+    cuposOcupados: 48, // Simulado (casi lleno)
+    status: "OPEN",
+    mensaje: "Pocos cupos disponibles",
+    puertas: [
+      { id: "soc_vene", nombre: "Puerta Venezuela", status: "OPEN" }
+    ]
+  },
+  {
+    id: "bio",
+    nombre: "Área Biomédicas",
+    cuposTotales: 50,
+    cuposOcupados: 0,
+    status: "CLOSED",
+    mensaje: "Cerrado por domingo",
+    puertas: [
+      { id: "bio_virg", nombre: "Puerta Virgen del Pilar", status: "CLOSED" },
+      { id: "bio_alc", nombre: "Puerta Daniel Alcides", status: "CLOSED" }
+    ]
+  }
+];
+// --- FIN DE DATOS ESTÁTICOS ---
+
+
+/**
+ * Obtiene el estado de todos los estacionamientos.
+ * Finge una llamada a la API.
+ */
+const getParkingStatus = (): Promise<ParkingStatusResponse> => {
+  
+  // Envolvemos los datos en una Promesa para simular una llamada de red
+  // Simulamos un retraso de 500ms (medio segundo)
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve({ areas: MOCK_AREAS });
+    }, 500);
+  });
+};
+
+// Exportamos un objeto con todas las funciones del servicio
+const ParkingService = {
+  getParkingStatus,
+  // Aquí pondríamos getHistory, getUserProfile, etc.
+};
+
+// Usamos 'export default' para evitar el error de antes
+export default ParkingService;
+
+entities.ts:
+// Define los posibles estados para evitar errores de tipeo
+export type PuertaStatus = "OPEN" | "CLOSED" | "MAINTENANCE";
+export type AreaStatus = "OPEN" | "CLOSED" | "FULL" | "EVENT";
+
+export interface Puerta {
+  id: string;
+  nombre: string;
+  status: PuertaStatus;
+}
+
+export interface Area {
+  id: string;
+  nombre: string;
+  cuposTotales: number;
+  cuposOcupados: number;
+  status: AreaStatus;
+  mensaje: string; // Ej: "Cerrado por domingo", "Lleno", o ""
+  puertas: Puerta[];
+}
+
+// Esta es la forma de la respuesta que esperamos de nuestra "API"
+export interface ParkingStatusResponse {
+  areas: Area[];
+}
