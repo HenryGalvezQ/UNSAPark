@@ -1,62 +1,78 @@
 import React, { useState } from 'react';
 import { 
-  View, Text, TextInput, Button, StyleSheet, 
+  View, Text, TextInput, StyleSheet, 
   TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform
 } from 'react-native';
-import ParkingService from '../services/ParkingService'; // Importamos el servicio
-import { Ionicons } from '@expo/vector-icons'; // Para el ícono
+import ParkingService from '../services/ParkingService'; 
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../types/navigation';
 
-// Simulación de 'props' de navegación
+type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
+
+// 1. CORRECCIÓN DE TIPO: onLogin ahora recibe el rol
 type LoginScreenProps = {
-  onLogin: () => void; // Función que pasaremos para "iniciar sesión"
+  onLogin: (role: 'USER' | 'ADMIN') => void;
 };
 
 export default function LoginScreen({ onLogin }: LoginScreenProps) {
-  // Estados para guardar los datos del formulario
+  const navigation = useNavigation<LoginScreenNavigationProp>();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  // Estado para mostrar un "cargando..." mientras validamos
   const [isLoading, setIsLoading] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
-  // Función que se llama al presionar "Ingresar"
+
   const handleLoginPress = async () => {
+    console.log("🔵 Iniciando proceso de login...");
+
     if (!email || !password) {
-      Alert.alert('Error', 'Por favor, ingrese su correo y contraseña.');
+      Alert.alert('Atención', 'Por favor, ingrese correo y contraseña.');
       return;
     }
 
-    setIsLoading(true); // Mostrar "cargando"
+    setIsLoading(true);
 
     try {
-      // Llamamos a nuestra API simulada
-      const exito = await ParkingService.login(email, password);
+      console.log(`📡 Consultando API para: ${email}`);
+      const result = await ParkingService.login(email, password);
+      console.log("🟢 Respuesta API:", JSON.stringify(result, null, 2));
 
-      if (exito) {
-        // Si el login es exitoso, llamamos a la función onLogin
-        // que nos pasó App.tsx para cambiar de pantalla.
-        onLogin();
+      if (result.success && result.user) {
+        const { role, status } = result.user; // Obtenemos el rol y el status
+        console.log(`🧐 Estado del usuario: ${status}`);
+        console.log('rol del usuario:', role);
+        // CASO A: ES ADMINISTRADOR
+        if (role === 'ADMIN') {
+          onLogin('ADMIN'); // <--- ENVIAMOS 'ADMIN' PARA QUE APP.TSX LO SEPA
+          return;
+        }
+        // CASO B: ES USUARIO NORMAL (Verificar aprobación)
+        if (status === 'APROBADO') {
+          onLogin('USER'); // <--- ENVIAMOS 'USER'
+        } else if (status === 'PENDIENTE') {
+          Alert.alert("En Revisión", "Tu solicitud aún no ha sido aprobada por el administrador.");
+        }
+        else if (status === 'RECHAZADO') {
+          console.log("❌ Usuario RECHAZADO.");
+          Alert.alert("Solicitud Rechazada", "Contacta a soporte.");
+        }
+
       } else {
-        // Si no, mostramos un error
-        Alert.alert('Error', 'Correo o contraseña incorrectos.');
+        console.log("🔴 Login fallido:", result.msg);
+        Alert.alert('Error de Acceso', result.msg || 'Credenciales incorrectas');
       }
     } catch (error) {
-      Alert.alert('Error', 'Ocurrió un problema de conexión.');
+      console.error("💥 Error Crítico:", error);
+      Alert.alert('Error', 'Problema de conexión con el servidor.');
     } finally {
-      setIsLoading(false); // Ocultar "cargando"
+      setIsLoading(false);
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
-
   return (
-    // KeyboardAvoidingView evita que el teclado tape los inputs
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.container}>
       <View style={styles.logoContainer}>
         <Ionicons name="car-sport" size={64} color="#0066CC" />
         <Text style={styles.title}>UNSA Park</Text>
@@ -68,10 +84,9 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
           style={styles.input}
           placeholder="Correo Electrónico"
           value={email}
-          onChangeText={setEmail} // Actualiza el estado 'email'
-          keyboardType="email-address" // Muestra teclado para email
-          autoCapitalize="none" // Desactiva mayúsculas automáticas
-          autoCorrect={false}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
         />
         <View style={styles.passwordContainer}>
           <TextInput
@@ -79,101 +94,39 @@ export default function LoginScreen({ onLogin }: LoginScreenProps) {
             placeholder="Contraseña"
             value={password}
             onChangeText={setPassword}
-            // El 'secureTextEntry' ahora depende del estado
             secureTextEntry={!isPasswordVisible}
           />
-          <TouchableOpacity 
-            style={styles.eyeIcon} 
-            onPress={togglePasswordVisibility}
-          >
-            <Ionicons 
-              // Cambia el ícono dependiendo del estado
-              name={isPasswordVisible ? 'eye-off' : 'eye'} 
-              size={24} 
-              color="#555" 
-            />
+          <TouchableOpacity style={styles.eyeIcon} onPress={() => setIsPasswordVisible(!isPasswordVisible)}>
+            <Ionicons name={isPasswordVisible ? 'eye-off' : 'eye'} size={24} color="#555" />
           </TouchableOpacity>
         </View>
 
-        {/* Usamos un TouchableOpacity para un botón más bonito */}
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={handleLoginPress}
-          disabled={isLoading} // Deshabilita el botón si está cargando
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>Ingresar</Text>
-          )}
+        <TouchableOpacity style={styles.button} onPress={handleLoginPress} disabled={isLoading}>
+          {isLoading ? <ActivityIndicator color="#ffffff" /> : <Text style={styles.buttonText}>Ingresar</Text>}
         </TouchableOpacity>
+
+        <View style={styles.linksContainer}>
+          <TouchableOpacity onPress={() => navigation.navigate('Register')}>
+            <Text style={styles.linkText}>¿No tienes cuenta? <Text style={styles.linkBold}>Regístrate aquí</Text></Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#0066CC',
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#555',
-  },
-  formContainer: {
-    width: '100%',
-  },
-  input: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginBottom: 16,
-  },
-  inputPassword: {
-    flex: 1, // El input toma todo el espacio
-    paddingHorizontal: 16, 
-    paddingVertical: 12, 
-    fontSize: 16,
-  },
-  eyeIcon: {
-    padding: 12, // Área táctil para el ícono
-  },
-  button: {
-    backgroundColor: '#0066CC',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  container: { flex: 1, justifyContent: 'center', backgroundColor: '#f5f5f5', padding: 20 },
+  logoContainer: { alignItems: 'center', marginBottom: 40 },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#0066CC', marginTop: 16 },
+  subtitle: { fontSize: 18, color: '#555' },
+  formContainer: { width: '100%' },
+  input: { backgroundColor: '#ffffff', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', fontSize: 16, marginBottom: 16 },
+  passwordContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 8, borderWidth: 1, borderColor: '#ddd', marginBottom: 16 },
+  inputPassword: { flex: 1, paddingHorizontal: 16, paddingVertical: 12, fontSize: 16 },
+  eyeIcon: { padding: 12 },
+  button: { backgroundColor: '#0066CC', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 8 },
+  buttonText: { color: '#ffffff', fontSize: 16, fontWeight: 'bold' },
+  linksContainer: { marginTop: 25, alignItems: 'center', gap: 15 },
+  linkText: { color: '#555', fontSize: 15 }
 });

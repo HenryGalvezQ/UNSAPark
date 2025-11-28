@@ -53,3 +53,54 @@ export interface UserProfile {
   escuela: string;
   vehiculos: Vehiculo[];
 }
+
+// ... (Mantén tus tipos Puerta, Area, HistoryItem existentes)
+
+export type CondicionLaboral = 'DOCENTE' | 'ADMINISTRATIVO' | 'CAS' | 'ESTUDIANTE' | 'OTRO';
+export type StatusSolicitud = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+
+// Interfaz para el Registro y el Admin
+export interface UserRequest {
+  _id?: string;
+  email: string;
+  password?: string;
+  nombreCompleto: string;
+  dni: string;
+  telefono: string;
+  role?: 'USER' | 'ADMIN';
+  datosPersonales: {
+    dependencia: string;
+    cargo: string;
+    fechaIngreso: string; // En frontend usamos string para fechas
+    condicionLaboral: CondicionLaboral;
+  };
+
+  vehiculo: {
+    marca: string;
+    modelo: string;
+    placa: string;
+    color: string;
+  };
+
+  documentos: {
+    dniUrl: string;
+    licenciaUrl: string;
+  };
+
+  statusSolicitud: StatusSolicitud;
+}
+
+// Interfaz corregida para la respuesta del Login
+export interface AuthResponse {
+  success: boolean;
+  token?: string;
+  user?: {
+    id: string;
+    nombre: string;
+    email: string;
+    role: 'USER' | 'ADMIN'; // <--- NUEVO
+    status: StatusSolicitud; // <--- CAMBIO AQUÍ: Se llama 'status', no 'statusSolicitud'
+    vehiculo: any;
+  };
+  msg?: string;
+}

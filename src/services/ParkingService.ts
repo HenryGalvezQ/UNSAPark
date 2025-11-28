@@ -3,7 +3,8 @@ import {
   Area,
   HistoryItem,
   UserProfile,
-  Vehiculo
+  UserRequest,
+  AuthResponse
 } from '../types/entities';
 
 // --- ESTOS SON TUS DATOS ESTÁTICOS ---
@@ -92,17 +93,59 @@ const getParkingStatus = (): Promise<ParkingStatusResponse> => {
   });
 };
 
-const login = (email: string, password: string): Promise<boolean> => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      // Lógica de simulación actualizada:
-      const loginExitoso = (
-        email.toLowerCase() === "correo@gmail.com" && 
-        password === "contraseña123"
-      );
-      resolve(loginExitoso);
-    }, 1000);
-  });
+// --- LOGIN REAL ---
+const login = async (email: string, pass: string): Promise<AuthResponse> => {
+  try {
+    console.log(`📡 Login a: ${API_URL}/auth/login`);
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: pass }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return { 
+        success: true, 
+        token: data.token, 
+        user: data.user // Aquí viene el statusSolicitud
+      };
+    } else {
+      return { success: false, msg: data.msg || 'Error de credenciales' };
+    }
+  } catch (error) {
+    console.error("Error Login:", error);
+    return { success: false, msg: 'No se pudo conectar al servidor.' };
+  }
+};
+
+const API_URL = 'https://unmoiled-unadoptively-rosella.ngrok-free.dev/api';
+// --- FUNCIONES REALES (CONECTADAS AL BACKEND) ---
+
+const register = async (userData: UserRequest): Promise<{ success: boolean; msg?: string }> => {
+  try {
+    console.log("📡 Enviando datos a:", `${API_URL}/auth/register`);
+    
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(userData),
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      return { success: true };
+    } else {
+      return { success: false, msg: data.msg || 'Error desconocido en el servidor' };
+    }
+  } catch (error) {
+    console.error("❌ Error de conexión:", error);
+    return { success: false, msg: 'No se pudo conectar con el servidor. Verifica tu IP.' };
+  }
 };
 
 // Definimos los tipos de filtro
@@ -186,6 +229,31 @@ const getLatestMovement = (): Promise<HistoryItem | null> => {
 };
 // --- FIN NUEVA FUNCIÓN ---
 
+const getPendingRequests = async (): Promise<UserRequest[]> => {
+  try {
+    const response = await fetch(`${API_URL}/admin/pending`);
+    const data = await response.json();
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error("Error fetching requests:", error);
+    return [];
+  }
+};
+
+const approveRequest = async (id: string, status: 'APROBADO' | 'RECHAZADO'): Promise<boolean> => {
+  try {
+    const response = await fetch(`${API_URL}/admin/requests/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }) // Enviamos el estado
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("Error aprobando:", error);
+    return false;
+  }
+};
+
 // --- EXPORTACIÓN ---
 const ParkingService = {
   getParkingStatus,
@@ -193,6 +261,9 @@ const ParkingService = {
   getUserHistory,
   getUserProfile,
   getLatestMovement,
+  register,
+  getPendingRequests,
+  approveRequest
 };
 
 export default ParkingService;

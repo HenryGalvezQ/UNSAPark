@@ -10,4 +10,9 @@ export type RootStackParamList = {
   MainApp: undefined; // Esta es la pantalla que contiene las PESTAÑAS
   AreaDetail: { area: Area }; // Esta pantalla REQUIERE un objeto 'area';
   RouteMap: { puerta: Puerta };
+  // --- NUEVAS RUTAS ---
+  Register: undefined;
+  AdminRequests: undefined; // Lista de solicitudes
+  RequestDetail: { requestId: string }; // Detalle para aprobar
+  AdminApp: undefined; 
 };
