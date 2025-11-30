@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   StyleSheet, Text, View, ActivityIndicator,
-  ScrollView, StatusBar
+  ScrollView, StatusBar, TouchableOpacity
 } from 'react-native';
 import ParkingService from '../services/ParkingService';
 import { Area, AreaStatus, HistoryItem } from '../types/entities';
@@ -20,6 +20,7 @@ const statusText = (status: AreaStatus) => ({
   marginTop: 8, borderTopColor: '#eee', borderTopWidth: 1, paddingTop: 8,
 });
 
+// 🔹 AreaCard nuevamente touchable como antes
 function AreaCard({ area }: { area: Area }) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const puertasDisponibles = area.puertas.filter(
@@ -29,7 +30,11 @@ function AreaCard({ area }: { area: Area }) {
   const tieneDisponibilidad = puertasDisponibles > 0;
 
   return (
-    <View style={styles.areaCard}>
+    <TouchableOpacity
+      style={styles.areaCard}
+      onPress={() => navigation.navigate('AreaDetail', { area })}
+      activeOpacity={0.85}
+    >
       <Text style={styles.areaTitle}>{area.nombre}</Text>
       <View style={styles.cuposContainer}>
         <Ionicons
@@ -48,7 +53,7 @@ function AreaCard({ area }: { area: Area }) {
       {area.mensaje && (
         <Text style={statusText(area.status)}>Nota: {area.mensaje}</Text>
       )}
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -90,6 +95,7 @@ export default function HomeScreen() {
     );
   }
 
+  // Si viene estacionado en false → card gris
   const isParked = latestMovement?.estacionado === true;
 
   return (
@@ -151,7 +157,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   areaTitle: { fontSize: 20, fontWeight: '600', color: '#0066CC', marginBottom: 12 },
-  cuposContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, },
+  cuposContainer: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   latestCard: {
     borderRadius: 12,
     padding: 20,
