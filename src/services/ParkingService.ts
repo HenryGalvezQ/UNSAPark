@@ -6,8 +6,18 @@ import {
   UserRequest,
   AuthResponse
 } from '../types/entities';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// --- ESTOS SON TUS DATOS ESTÁTICOS ---
+/**
+ * ParkingService: comunicación con backend.
+ * - Guarda token + user en AsyncStorage al login.
+ * - getUserProfile lee el user guardado en AsyncStorage (porque no hay /auth/profile).
+ * - getLatestMovement / getUserHistory usan la placa del user.
+ */
+
+const API_URL = 'https://decapodous-daniela-sidlingly.ngrok-free.dev/api';
+
+// --- MOCK ÁREAS (se mantiene para el mapa si backend no provee) ---
 const MOCK_AREAS: Area[] = [
   {
     id: "ing",
@@ -20,8 +30,8 @@ const MOCK_AREAS: Area[] = [
     longitudeDelta: 0.005,
     puertas: [
       { id: "ing_pauc", nombre: "Puerta Paucarpata", status: "OPEN", latitude: -16.404937, longitude: -71.526682, cuposTotales: 30, cuposOcupados: 12 },
-      { id: "ing_inde", nombre: "Puerta Independencia", status: "OPEN", latitude: -16.403070, longitude: -71.525817, cuposTotales: 30, cuposOcupados: 28 }, // Casi llena
-      { id: "ing_vene", nombre: "Puerta Venezuela", status: "MAINTENANCE", latitude: -16.406396, longitude: -71.523213, cuposTotales: 30, cuposOcupados: 0 } // Cerrada
+      { id: "ing_inde", nombre: "Puerta Independencia", status: "OPEN", latitude: -16.403070, longitude: -71.525817, cuposTotales: 30, cuposOcupados: 28 },
+      { id: "ing_vene", nombre: "Puerta Venezuela", status: "MAINTENANCE", latitude: -16.406396, longitude: -71.523213, cuposTotales: 30, cuposOcupados: 0 }
     ]
   },
   {
@@ -34,7 +44,7 @@ const MOCK_AREAS: Area[] = [
     latitudeDelta: 0.003,
     longitudeDelta: 0.003,
     puertas: [
-      { id: "soc_virg", nombre: "Puerta Virgen del Pilar", status: "OPEN", latitude: -16.405293, longitude: -71.520728, cuposTotales: 30, cuposOcupados: 30 } // Llena
+      { id: "soc_virg", nombre: "Puerta Virgen del Pilar", status: "OPEN", latitude: -16.405293, longitude: -71.520728, cuposTotales: 30, cuposOcupados: 30 }
     ]
   },
   {
@@ -52,218 +62,220 @@ const MOCK_AREAS: Area[] = [
     ]
   }
 ];
-// --- FIN DE DATOS ESTÁTICOS ---
 
-// --- MOCK HISTORIAL ---
-const ALL_MOCK_HISTORY: HistoryItem[] = [
-  { id: "1", area: "Ingenierías", puerta: "Puerta Paucarpata", placa: "V1X-234", fechaEntrada: "2025-11-11 14:30", fechaSalida: null },
-  { id: "2", area: "Sociales", puerta: "Virgen del Pilar", placa: "V1X-234", fechaEntrada: "2025-11-10 09:15", fechaSalida: "2025-11-10 11:20" },
-  { id: "3", area: "Biomédicas", puerta: "Daniel Alcides", placa: "A9B-567", fechaEntrada: "2025-11-09 11:00", fechaSalida: "2025-11-09 13:00" },
-  { id: "4", area: "Ingenierías", puerta: "Independencia", placa: "V1X-234", fechaEntrada: "2025-11-09 08:00", fechaSalida: "2025-11-09 10:30" },
-  { id: "5", area: "Ingenierías", puerta: "Paucarpata", placa: "V1X-234", fechaEntrada: "2025-11-07 10:00", fechaSalida: "2025-11-07 12:00" },
-  { id: "6", area: "Sociales", puerta: "Virgen del Pilar", placa: "A9B-567", fechaEntrada: "2025-11-07 09:30", fechaSalida: "2025-11-07 11:30" },
-  { id: "7", area: "Biomédicas", puerta: "Virgen del Pilar", placa: "V1X-234", fechaEntrada: "2025-11-05 15:00", fechaSalida: "2025-11-05 17:00" },
-  { id: "8", area: "Ingenierías", puerta: "Venezuela", placa: "V1X-234", fechaEntrada: "2025-11-05 10:10", fechaSalida: "2025-11-05 12:00" },
-  { id: "9", area: "Sociales", puerta: "Virgen del Pilar", placa: "A9B-567", fechaEntrada: "2025-11-04 09:00", fechaSalida: "2025-11-04 18:00" },
-  { id: "10", area: "Ingenierías", puerta: "Paucarpata", placa: "V1X-234", fechaEntrada: "2025-11-01 10:00", fechaSalida: "2025-11-01 12:00" },
-];
+// -------------------- Auth / Profile utilities --------------------
+const STORAGE_TOKEN_KEY = '@unsapark_token';
+const STORAGE_USER_KEY = '@unsapark_user';
 
-// --- MOCK PERFIL ---
-const MOCK_USER_PROFILE: UserProfile = {
-  id: "u1",
-  nombreCompleto: "Juan Pérez García",
-  email: "correo@gmail.com",
-  dni: "12345678",
-  tipoUsuario: "Estudiante",
-  codigo: "2020-12345",
-  escuela: "Ingeniería de Sistemas",
-  vehiculos: [
-    { placa: "V1X-234", modelo: "Toyota Corolla" },
-    { placa: "A9B-567", modelo: "Honda Civic" }
-  ]
+/**
+ * Guarda token y user en AsyncStorage (por login).
+ */
+const saveAuthToStorage = async (token: string, user: any) => {
+  try {
+    await AsyncStorage.setItem(STORAGE_TOKEN_KEY, token);
+    await AsyncStorage.setItem(STORAGE_USER_KEY, JSON.stringify(user));
+  } catch (e) {
+    console.warn("Error saving auth to storage:", e);
+  }
 };
 
-// --- FUNCIONES DEL SERVICIO ---
-
-const getParkingStatus = (): Promise<ParkingStatusResponse> => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve({ areas: MOCK_AREAS });
-    }, 500);
-  });
+/**
+ * Borra auth (por si quieres logout).
+ */
+const clearAuthStorage = async () => {
+  try {
+    await AsyncStorage.removeItem(STORAGE_TOKEN_KEY);
+    await AsyncStorage.removeItem(STORAGE_USER_KEY);
+  } catch (e) {
+    console.warn("Error clearing storage:", e);
+  }
 };
 
-// --- LOGIN REAL ---
+/**
+ * Devuelve token si está.
+ */
+const getTokenFromStorage = async (): Promise<string | null> => {
+  try {
+    return await AsyncStorage.getItem(STORAGE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Devuelve el user guardado (o null).
+ */
+const getUserFromStorage = async (): Promise<UserProfile | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_USER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Normalizamos a UserProfile shape si hace falta (backend tiene "vehiculo")
+    const profile: UserProfile = {
+      id: parsed.id || parsed._id || 'u1',
+      nombreCompleto: parsed.nombre || parsed.nombreCompleto || '',
+      email: parsed.email || '',
+      dni: parsed.dni || '',
+      tipoUsuario: parsed.role || parsed.tipoUsuario || '',
+      codigo: parsed.codigo || '',
+      escuela: parsed.escuela || '',
+      // Si backend usa "vehiculo" en singular, lo adaptamos a array para la interfaz
+      vehiculos: parsed.vehiculo ? [{ placa: parsed.vehiculo.placa || '' , modelo: parsed.vehiculo.modelo || '' }] :
+                parsed.vehiculos || []
+    };
+    return profile;
+  } catch (e) {
+    console.warn("Error reading user from storage:", e);
+    return null;
+  }
+};
+
+// -------------------- Endpoints --------------------
+
+// LOGIN real: guarda token + user en AsyncStorage
 const login = async (email: string, pass: string): Promise<AuthResponse> => {
   try {
-    console.log(`📡 Login a: ${API_URL}/auth/login`);
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const resp = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass }),
     });
 
-    const data = await response.json();
+    const data = await resp.json();
+    if (!resp.ok) return { success: false, msg: data?.msg || 'Credenciales inválidas' };
 
-    if (response.ok) {
-      return { 
-        success: true, 
-        token: data.token, 
-        user: data.user // Aquí viene el statusSolicitud
-      };
-    } else {
-      return { success: false, msg: data.msg || 'Error de credenciales' };
-    }
-  } catch (error) {
-    console.error("Error Login:", error);
-    return { success: false, msg: 'No se pudo conectar al servidor.' };
+    // backend devuelve user.vehiculo con placa -> guardamos ese user
+    await saveAuthToStorage(data.token, data.user);
+    return { success: true, token: data.token, user: data.user };
+
+  } catch (e) {
+    console.warn("Login error:", e);
+    return { success: false, msg: 'No se pudo conectar al servidor' };
   }
 };
 
-const API_URL = 'https://unmoiled-unadoptively-rosella.ngrok-free.dev/api';
-// --- FUNCIONES REALES (CONECTADAS AL BACKEND) ---
-
+// REGISTER real (igual que antes)
 const register = async (userData: UserRequest): Promise<{ success: boolean; msg?: string }> => {
   try {
-    console.log("📡 Enviando datos a:", `${API_URL}/auth/register`);
-    
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const resp = await fetch(`${API_URL}/auth/register`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(userData),
     });
-
-    const data = await response.json();
-
-    if (response.ok) {
-      return { success: true };
-    } else {
-      return { success: false, msg: data.msg || 'Error desconocido en el servidor' };
-    }
-  } catch (error) {
-    console.error("❌ Error de conexión:", error);
-    return { success: false, msg: 'No se pudo conectar con el servidor. Verifica tu IP.' };
+    const d = await resp.json();
+    return resp.ok ? { success: true } : { success: false, msg: d.msg || 'Error' };
+  } catch (e) {
+    console.warn("Register error:", e);
+    return { success: false, msg: 'Error de conexión' };
   }
 };
 
-// Definimos los tipos de filtro
-type HistoryFilter = 'today' | 'week' | 'month'| 'all';
-// --- 2. ACTUALIZAMOS getUserHistory PARA PAGINACIÓN ---
-const PAGE_SIZE = 5; // Diremos que nuestra API devuelve 5 items a la vez
-
-/**
- * Simula la obtención del historial de un usuario, por páginas y con filtro.
- */
-const getUserHistory = (
-  page: number = 1,
-  // El filtro puede ser un string o una fecha específica
-  filter: HistoryFilter | Date = 'all'
-): Promise<HistoryItem[]> => {
-  
-  return new Promise(resolve => {
-    setTimeout(() => {
-      // --- 1. Usamos la fecha real del sistema ---
-      const now = new Date(); 
-      // NOTA: Para probar con tus datos MOCK, temporalmente cambia 'now' por:
-      // const now = new Date('2025-11-10T10:00:00');
-
-      const filteredHistory = ALL_MOCK_HISTORY.filter(item => {
-        const itemDate = new Date(item.fechaEntrada);
-        
-        // --- 2. Lógica de Filtro Actualizada ---
-        if (filter === 'all') {
-          return true; // No filtra nada, devuelve todos
-        }
-        if (filter instanceof Date) {
-          // Filtro de calendario: compara solo el día
-          return itemDate.toDateString() === filter.toDateString();
-        }
-        if (filter === 'today') {
-          return itemDate.toDateString() === now.toDateString();
-        }
-        if (filter === 'week') {
-          const lastWeek = new Date(now);
-          lastWeek.setDate(now.getDate() - 7);
-          // Aseguramos que solo cuente hasta "hoy"
-          return itemDate >= lastWeek && itemDate <= now;
-        }
-        if (filter === 'month') {
-          return itemDate.getMonth() === now.getMonth() && 
-                 itemDate.getFullYear() === now.getFullYear();
-        }
-        return true;
-      });
-      // --- Fin Lógica de Filtro ---
-
-      const start = (page - 1) * PAGE_SIZE;
-      const end = page * PAGE_SIZE;
-      resolve(filteredHistory.slice(start, end));
-    }, 700);
-  });
+// Obtener perfil desde AsyncStorage (porque no hay /auth/profile)
+const getUserProfile = async (): Promise<UserProfile | null> => {
+  return await getUserFromStorage();
 };
 
-const getUserProfile = (): Promise<UserProfile> => {
-  return new Promise(resolve => {
-    setTimeout(() => {
-      resolve(MOCK_USER_PROFILE);
-    }, 300);
-  });
+// getParkingStatus (usa mock areas)
+const getParkingStatus = async (): Promise<ParkingStatusResponse> => {
+  return { areas: MOCK_AREAS };
 };
-// --- 2. NUEVA FUNCIÓN ---
-/**
- * Simula la obtención del último movimiento (esté activo o finalizado)
- */
-const getLatestMovement = (): Promise<HistoryItem | null> => {
-  return new Promise(resolve => {
-    // Retraso corto
-    setTimeout(() => {
-      if (ALL_MOCK_HISTORY.length > 0) {
-        resolve(ALL_MOCK_HISTORY[0]); // Devuelve el item más reciente
-      } else {
-        resolve(null);
-      }
-    }, 400); 
-  });
-};
-// --- FIN NUEVA FUNCIÓN ---
 
+// Último movimiento real: GET /history/latest/:placa
+// Si falla o no hay datos -> devuelve null
+const getLatestMovement = async (placa: string): Promise<HistoryItem | null> => {
+  if (!placa) return null;
+  try {
+    const token = await getTokenFromStorage();
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(`${API_URL}/history/latest/${placa}`, { headers });
+    if (!resp.ok) {
+      // 404 o 204 -> no hay movimiento
+      return null;
+    }
+    const data = await resp.json();
+    // Data puede venir con estructura { estacionado: true, ... } o directamente HistoryItem
+    // Asumimos que si no está vacío y tiene fechaEntrada, es válido.
+    if (!data || Object.keys(data).length === 0) return null;
+    // Si backend envía { estacionado: true, item: {...} } manejamos ambos casos
+    if (data.item) return data.item;
+    return data;
+  } catch (e) {
+    console.warn("getLatestMovement error:", e);
+    return null;
+  }
+};
+
+// Historial real paginado: GET /history/vehicle/:placa?page=X
+const getUserHistory = async (placa: string, page: number = 1): Promise<HistoryItem[]> => {
+  if (!placa) return [];
+  try {
+    const token = await getTokenFromStorage();
+    const headers: any = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const resp = await fetch(`${API_URL}/history/vehicle/${placa}?page=${page}`, {
+      headers,
+    });
+
+    if (!resp.ok) {
+      console.warn("History response not OK:", resp.status);
+      return [];
+    }
+
+    const data = await resp.json();
+
+    // backend devolviendo { page, total, totalPages, data: [] }
+    if (Array.isArray(data.data)) return data.data;
+
+    // backend devolviendo directamente el array
+    if (Array.isArray(data)) return data;
+
+    return [];
+
+  } catch (e) {
+    console.warn("getUserHistory error:", e);
+    return [];
+  }
+};
+
+// Admin (sin cambios importantes)
 const getPendingRequests = async (): Promise<UserRequest[]> => {
   try {
-    const response = await fetch(`${API_URL}/admin/pending`);
-    const data = await response.json();
-    return Array.isArray(data) ? data : [];
-  } catch (error) {
-    console.error("Error fetching requests:", error);
+    const resp = await fetch(`${API_URL}/admin/pending`);
+    const d = await resp.json();
+    return Array.isArray(d) ? d : [];
+  } catch {
     return [];
   }
 };
 
 const approveRequest = async (id: string, status: 'APROBADO' | 'RECHAZADO'): Promise<boolean> => {
   try {
-    const response = await fetch(`${API_URL}/admin/requests/${id}`, {
+    const resp = await fetch(`${API_URL}/admin/requests/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }) // Enviamos el estado
+      body: JSON.stringify({ status })
     });
-    return response.ok;
-  } catch (error) {
-    console.error("Error aprobando:", error);
+    return resp.ok;
+  } catch {
     return false;
   }
 };
 
-// --- EXPORTACIÓN ---
 const ParkingService = {
-  getParkingStatus,
   login,
-  getUserHistory,
-  getUserProfile,
-  getLatestMovement,
   register,
+  getUserProfile,
+  getParkingStatus,
+  getLatestMovement,
+  getUserHistory,
   getPendingRequests,
-  approveRequest
+  approveRequest,
+  // util:
+  clearAuthStorage,
+  saveAuthToStorage
 };
 
 export default ParkingService;
