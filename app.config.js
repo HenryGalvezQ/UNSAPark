@@ -23,6 +23,7 @@ version: "1.0.0",
     },
     android: {
       // Aquí leemos la clave para Android
+      usesCleartextTraffic: true,
       config: {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -31,7 +32,8 @@ version: "1.0.0",
       permissions: [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      package: "com.unsapark.app"
     },
   }
 }
