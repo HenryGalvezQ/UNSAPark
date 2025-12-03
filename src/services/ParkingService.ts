@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * - getLatestMovement / getUserHistory usan la placa del user.
  */
 
-const API_URL = 'http://192.168.1.3:3000/api';
+const API_URL = 'http://67.205.133.92:3000/api';
 
 // --- MOCK ÁREAS (se mantiene para el mapa si backend no provee) ---
 const MOCK_AREAS: Area[] = [
@@ -194,7 +194,17 @@ const getUserProfile = async (): Promise<UserProfile | null> => {
 
 // getParkingStatus (usa mock areas)
 const getParkingStatus = async (): Promise<ParkingStatusResponse> => {
-  return { areas: MOCK_AREAS };
+  try {
+    const resp = await fetch(`${API_URL}/parking/status`);
+    if (!resp.ok) {
+       return { areas: MOCK_AREAS }; 
+    }
+    const data = await resp.json();
+    return data; 
+  } catch (e) {
+    console.warn("Error fetching status:", e);
+    return { areas: MOCK_AREAS }; 
+  }
 };
 
 // Último movimiento real: GET /history/latest/:placa

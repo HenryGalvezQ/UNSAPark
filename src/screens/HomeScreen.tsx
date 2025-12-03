@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ActivityIndicator,
   ScrollView, StatusBar, TouchableOpacity
 } from 'react-native';
 import ParkingService from '../services/ParkingService';
 import { Area, AreaStatus, HistoryItem } from '../types/entities';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native'; 
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,7 +20,7 @@ const statusText = (status: AreaStatus) => ({
   marginTop: 8, borderTopColor: '#eee', borderTopWidth: 1, paddingTop: 8,
 });
 
-// 🔹 AreaCard nuevamente touchable como antes
+// Componente Tarjeta
 function AreaCard({ area }: { area: Area }) {
   const navigation = useNavigation<HomeScreenNavigationProp>();
   const puertasDisponibles = area.puertas.filter(
@@ -57,35 +57,44 @@ function AreaCard({ area }: { area: Area }) {
   );
 }
 
+// PANTALLA PRINCIPAL CORREGIDA
 export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [areas, setAreas] = useState<Area[]>([]);
   const [latestMovement, setLatestMovement] = useState<HistoryItem | null>(null);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const profile = await ParkingService.getUserProfile();
-        const placa = profile.vehiculos[0].placa;
+  const loadData = async () => {
+    try {
+      const profile = await ParkingService.getUserProfile();
+      const placa = profile?.vehiculos[0]?.placa;
 
-        const [areasData, latestMove] = await Promise.all([
-          ParkingService.getParkingStatus(),
-          ParkingService.getLatestMovement(placa)
-        ]);
+      const [areasData, latestMove] = await Promise.all([
+        ParkingService.getParkingStatus(),
+        placa ? ParkingService.getLatestMovement(placa) : Promise.resolve(null)
+      ]);
 
-        setAreas(areasData.areas);
-        setLatestMovement(latestMove);
+      setAreas(areasData.areas);
+      setLatestMovement(latestMove);
+    } catch (error) {
+      console.error("Error al cargar datos:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      } catch (error) {
-        console.error("Error al cargar datos:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+      
+      const intervalId = setInterval(() => {
+        loadData();
+      }, 5000);
 
-    loadData();
-  }, []);
+      return () => clearInterval(intervalId);
+    }, [])
+  );
 
+  // Renderizado
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -95,7 +104,6 @@ export default function HomeScreen() {
     );
   }
 
-  // Si viene estacionado en false → card gris
   const isParked = latestMovement?.estacionado === true;
 
   return (
@@ -104,7 +112,6 @@ export default function HomeScreen() {
       <Text style={styles.title}>Estacionamiento UNSA</Text>
 
       <ScrollView style={styles.list}>
-
         {latestMovement ? (
           isParked ? (
             <View style={[styles.latestCard, { backgroundColor: "#2ecc71" }]}>
@@ -133,7 +140,6 @@ export default function HomeScreen() {
         {areas.map(area => (
           <AreaCard key={area.id} area={area} />
         ))}
-
       </ScrollView>
     </View>
   );
