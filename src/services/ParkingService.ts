@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * - getLatestMovement / getUserHistory usan la placa del user.
  */
 
-const API_URL = 'https://decapodous-daniela-sidlingly.ngrok-free.dev/api';
+const API_URL = 'http://192.168.1.3:3000/api';
 
 // --- MOCK ÁREAS (se mantiene para el mapa si backend no provee) ---
 const MOCK_AREAS: Area[] = [
@@ -103,33 +103,50 @@ const getTokenFromStorage = async (): Promise<string | null> => {
 };
 
 /**
- * Devuelve el user guardado (o null).
+ * Devuelve el user guardado y lo adapta al formato visual del Perfil
  */
 const getUserFromStorage = async (): Promise<UserProfile | null> => {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_USER_KEY);
     if (!raw) return null;
+    
     const parsed = JSON.parse(raw);
-    // Normalizamos a UserProfile shape si hace falta (backend tiene "vehiculo")
+    console.log("Datos crudos recuperados:", parsed); // Para depurar si hace falta
+
+    // Mapeo seguro: Si el campo no existe, ponemos un texto por defecto
     const profile: UserProfile = {
-      id: parsed.id || parsed._id || 'u1',
-      nombreCompleto: parsed.nombre || parsed.nombreCompleto || '',
+      id: parsed.id || parsed._id || 'u_temp',
+      nombreCompleto: parsed.nombreCompleto || 'Usuario',
       email: parsed.email || '',
       dni: parsed.dni || '',
-      tipoUsuario: parsed.role || parsed.tipoUsuario || '',
-      codigo: parsed.codigo || '',
-      escuela: parsed.escuela || '',
-      // Si backend usa "vehiculo" en singular, lo adaptamos a array para la interfaz
-      vehiculos: parsed.vehiculo ? [{ placa: parsed.vehiculo.placa || '' , modelo: parsed.vehiculo.modelo || '' }] :
-                parsed.vehiculos || []
+      
+      // Mapeamos Condición Laboral -> Tipo de Usuario
+      // Si parsed.datosPersonales es undefined, usamos 'role' como respaldo
+      tipoUsuario: parsed.datosPersonales?.condicionLaboral || parsed.role || 'ESTUDIANTE',
+      
+      // Mapeamos DNI -> Código (Porque no tienes campo 'codigo' en BD)
+      codigo: parsed.dni || 'Sin Código', 
+      
+      // Mapeamos Dependencia -> Escuela Profesional
+      escuela: parsed.datosPersonales?.dependencia || 'No especificada',
+
+      // Mapeamos el vehículo. Tu BD tiene el objeto 'vehiculo', el perfil espera un array.
+      vehiculos: parsed.vehiculo 
+        ? [{ 
+            placa: parsed.vehiculo.placa || '---', 
+            modelo: parsed.vehiculo.modelo || 'Auto',
+            marca: parsed.vehiculo.marca || '',
+            color: parsed.vehiculo.color || ''
+          }] 
+        : []
     };
+
     return profile;
   } catch (e) {
-    console.warn("Error reading user from storage:", e);
+    console.warn("Error leyendo usuario del almacenamiento:", e);
     return null;
   }
 };
-
 // -------------------- Endpoints --------------------
 
 // LOGIN real: guarda token + user en AsyncStorage

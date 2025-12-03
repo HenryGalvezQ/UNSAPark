@@ -42,6 +42,8 @@ export interface HistoryItem {
 export interface Vehiculo {
   placa: string;
   modelo: string;
+  marca?: string; 
+  color?: string;
 }
 export interface UserProfile {
   id: string;
